@@ -1,59 +1,59 @@
-# Features of Mini-SGLang
+# Mini-SGLang 的功能特性
 
-## Online Serving
+## 在线服务
 
-Mini-SGLang supports online serving with an OpenAI-compatible API server. It provides the standard `/v1/chat/completions` endpoint, allowing seamless integration with existing tools and clients. For detailed command-line arguments and configuration options, run `python -m minisgl --help`.
+Mini-SGLang 支持通过兼容 OpenAI 的 API Server 进行在线服务。它提供标准的 `/v1/chat/completions` 接口，可以无缝接入现有工具和客户端。若要查看详细的命令行参数和配置选项，请运行 `python -m minisgl --help`。
 
-## Interactive Shell Mode
+## 交互式 Shell 模式
 
-For demonstration and testing purposes, an interactive shell mode is available. In this mode, users can input prompts directly, and the LLM will generate responses in real-time. The shell automatically caches chat history to maintain context. To clear the conversation history and start a new session, use the `/reset` command.
+为了便于演示和测试，项目提供了交互式 shell 模式。在该模式下，用户可以直接输入提示词，LLM 会实时生成回复。shell 会自动缓存聊天历史以维持上下文。如果想清空对话历史并开启新的会话，可以使用 `/reset` 命令。
 
-Example:
+示例：
 
 ```bash
 python -m minisgl --model "Qwen/Qwen3-0.6B" --shell
 ```
 
-## Distributed Serving
+## 分布式服务
 
-To scale performance across multiple GPUs, Mini-SGLang supports Tensor Parallelism (TP). You can enable distributed serving by specifying the number of GPUs with the `--tp n` argument, where `n` is the degree of parallelism.
+为了在多张 GPU 上扩展性能，Mini-SGLang 支持张量并行（Tensor Parallelism, TP）。你可以通过 `--tp n` 参数启用分布式服务，其中 `n` 表示并行度，也就是使用的 GPU 数量。
 
-## Supported Models
+## 支持的模型
 
-Our framework currently supports the following dense model architectures:
+目前框架支持以下稠密模型架构：
 
 - [`Llama-3`](https://huggingface.co/collections/meta-llama/llama-31) series
 - [`Qwen-3`](https://huggingface.co/collections/Qwen/qwen3) series (including MoE)
 - [`Qwen-2.5`](https://huggingface.co/collections/Qwen/qwen25) series
 
-## Chunked Prefill
+## 分块 Prefill
 
-Chunked Prefill, a technique introduced by [Sarathi-Serve](https://arxiv.org/abs/2403.02310), is enabled by default. This feature splits long prompts into smaller chunks during the prefill phase, significantly reducing peak memory usage and preventing Out-Of-Memory (OOM) errors in long-context serving. The chunk size can be configured using `--max-prefill-length n`. Note that setting `n` to a very small value (e.g., 128) is not recommended as it may significantly degrade performance.
+默认启用了分块 Prefill（Chunked Prefill），这项技术最早由 [Sarathi-Serve](https://arxiv.org/abs/2403.02310) 提出。该特性会在 prefill 阶段将长提示词拆分成更小的块，从而显著降低峰值显存占用，并避免长上下文服务时出现内存溢出（OOM）。你可以通过 `--max-prefill-length n` 配置块大小。需要注意的是，不建议将 `n` 设置得过小（例如 128），因为这可能会显著降低性能。
 
 ## Page Size
 
-You can specify the page size of the system using the `--page-size` argument.
+你可以通过 `--page-size` 参数指定系统使用的 page size。
 
-## Attention Backends
+## Attention 后端
 
-Mini-SGLang integrates high-performance attention kernels, including [`FlashAttention`](https://github.com/Dao-AILab/flash-attention) (`fa`), [`FlashInfer`](https://github.com/flashinfer-ai/flashinfer) (`fi`) and [`TensorRT-LLM fmha`](https://github.com/NVIDIA/TensorRT-LLM) (`trtllm`). It supports using different backends for the prefill and decode phases to maximize efficiency. For example, on NVIDIA Hopper GPUs, `FlashAttention 3` is used for prefill and `FlashInfer` for decode by default.
+Mini-SGLang 集成了多个高性能 attention kernel，包括 [`FlashAttention`](https://github.com/Dao-AILab/flash-attention)（`fa`）、[`FlashInfer`](https://github.com/flashinfer-ai/flashinfer)（`fi`）以及 [`TensorRT-LLM fmha`](https://github.com/NVIDIA/TensorRT-LLM)（`trtllm`）。它支持在 prefill 和 decode 阶段分别使用不同的后端，以最大化整体效率。例如，在 NVIDIA Hopper GPU 上，默认会使用 `FlashAttention 3` 处理 prefill，使用 `FlashInfer` 处理 decode。
 
-You can specify the backend using the `--attn` argument. If two values are provided (e.g., `--attn fa,fi`), the first specifies the prefill backend and the second the decode backend. Note that some attention backend might override the user-provided page size (e.g. `trtllm` only supports page size 16,32,64).
+你可以通过 `--attn` 参数指定后端。如果提供两个值（例如 `--attn fa,fi`），第一个表示 prefill 使用的后端，第二个表示 decode 使用的后端。需要注意的是，某些 attention 后端可能会覆盖用户指定的 page size（例如 `trtllm` 仅支持 16、32、64 的 page size）。
 
 ## CUDA Graph
 
-To minimize CPU launch overhead during decoding, Mini-SGLang supports capturing and replaying CUDA graphs. This feature is enabled by default. The maximum batch size for CUDA graph capture can be set with `--cuda-graph-max-bs n`. Setting `n` to `0` disables this feature.
+为了尽可能减少 decode 阶段的 CPU launch 开销，Mini-SGLang 支持 CUDA graph 的捕获与重放。该特性默认开启。你可以通过 `--cuda-graph-max-bs n` 设置 CUDA graph 捕获所支持的最大 batch size。将 `n` 设置为 `0` 会关闭该特性。
 
 ## Radix Cache
 
-Adopting the original design from [SGLang](https://github.com/sgl-project/sglang.git), Mini-SGLang implements a Radix Cache to manage the Key-Value (KV) cache. This allows the reuse of KV cache for shared prefixes across requests, reducing redundant computation. This feature is enabled by default but can be switched to a naive cache management strategy using `--cache naive`.
+Mini-SGLang 采用了 [SGLang](https://github.com/sgl-project/sglang.git) 的原始设计，实现了基于 Radix Tree 的缓存机制来管理 Key-Value（KV）Cache。这样可以在不同请求共享前缀时复用 KV Cache，从而减少重复计算。该特性默认开启，但你也可以通过 `--cache naive` 切换为朴素的缓存管理策略。
 
 ![radix](https://lmsys.org/images/blog/sglang/radix_attn.jpg)
-*Illustration of Radix Attention from [LMSYS Blog](https://lmsys.org/blog/2024-01-17-sglang/).*
+*来自 [LMSYS Blog](https://lmsys.org/blog/2024-01-17-sglang/) 的 Radix Attention 示意图。*
 
 ## Overlap Scheduling
 
-To further reduce CPU overhead, Mini-SGLang employs overlap scheduling, a technique proposed in [NanoFlow](https://arxiv.org/abs/2408.12757). This approach overlaps the CPU scheduling overhead with GPU computation, improving overall system throughput.
+为了进一步降低 CPU 开销，Mini-SGLang 使用了 Overlap Scheduling，这是一项由 [NanoFlow](https://arxiv.org/abs/2408.12757) 提出的技术。它将 CPU 调度开销与 GPU 计算重叠执行，从而提升整体系统吞吐。
 
 ![overlap](https://lmsys.org/images/blog/sglang_v0_4/scheduler.jpg)
-*Illustration of Overlap Scheduling from [LMSYS Blog](https://lmsys.org/blog/2024-12-04-sglang-v0-4/).*
+*来自 [LMSYS Blog](https://lmsys.org/blog/2024-12-04-sglang-v0-4/) 的 Overlap Scheduling 示意图。*
